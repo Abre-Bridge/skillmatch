@@ -11,6 +11,7 @@ class ApiService {
 
   private async request(endpoint: string, options: RequestInit = {}) {
     const url = `${this.baseUrl}${endpoint}`;
+    console.log(url);
     const config: RequestInit = {
       headers: {
         'Content-Type': 'application/json',
@@ -29,7 +30,7 @@ class ApiService {
 
       return data;
     } catch (error: any) {
-      console.error(`API Error [${endpoint}]:`, error.message);
+      console.error(`API Error [${url}]:`, error.message);
       throw error;
     }
   }

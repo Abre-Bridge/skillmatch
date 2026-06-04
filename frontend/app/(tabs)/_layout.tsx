@@ -8,6 +8,7 @@ export default function TabLayout() {
   const { colors, t } = useApp();
 
   return (
+    
     <Tabs
       screenOptions={{
         headerShown: false,
@@ -22,6 +23,7 @@ export default function TabLayout() {
           paddingTop: 10,
           elevation: 0, // Android shadow off to match ios
           shadowOpacity: 0,
+          marginBottom: 40,
         },
         tabBarLabelStyle: {
           fontFamily: 'Rubik-Medium',

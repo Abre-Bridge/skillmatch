@@ -42,7 +42,7 @@ export default function Index() {
   if (isLoggedIn) {
     return <Redirect href="/(tabs)/home" />;
   } else {
-    return <Redirect href="/(auth)/welcome" />;
+    return <Redirect href="/(tabs)/home" />;
   }
 }
 
