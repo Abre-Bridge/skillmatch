@@ -35,6 +35,10 @@ jobs:
         working-directory: frontend
         run: npx expo install expo-dev-client -- --legacy-peer-deps
 
+      - name: Fix reanimated
+        working-directory: frontend
+        run: npx expo install react-native-reanimated -- --legacy-peer-deps
+
       - name: Create .env file
         working-directory: frontend
         run: |
@@ -59,7 +63,7 @@ jobs:
 
       - name: Build Android APK
         working-directory: frontend/android
-        run: ./gradlew assembleDebug --no-daemon
+        run: ./gradlew assembleDebug --no-daemon --stacktrace
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
