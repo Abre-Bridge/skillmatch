@@ -29,11 +29,11 @@ jobs:
 
       - name: Install dependencies
         working-directory: frontend
-        run: npm install
+        run: npm install --legacy-peer-deps
 
       - name: Install expo-dev-client
         working-directory: frontend
-        run: npx expo install expo-dev-client
+        run: npx expo install expo-dev-client --legacy-peer-deps
 
       - name: Create .env file
         working-directory: frontend
