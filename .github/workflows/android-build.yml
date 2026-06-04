@@ -33,7 +33,7 @@ jobs:
 
       - name: Install expo-dev-client
         working-directory: frontend
-        run: npx expo install expo-dev-client --legacy-peer-deps
+        run: npx expo install expo-dev-client -- --legacy-peer-deps
 
       - name: Create .env file
         working-directory: frontend
