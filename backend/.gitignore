@@ -1,16 +1,6 @@
 # Dependencies
 node_modules/
 
-# Expo
-.expo/
-dist/
-web-build/
-expo-env.d.ts
-
-# Native builds
-android/
-ios/
-
 # Environment
 .env
 .env.local
@@ -19,18 +9,19 @@ ios/
 # Logs
 *.log
 npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
+logs/
 
 # OS
 .DS_Store
 Thumbs.db
 
-# TypeScript
-*.tsbuildinfo
+# Build
+dist/
+build/
+
+# Database
+*.sqlite
+*.db
 
 # Testing
 coverage/
-
-# Metro
-.metro-health-check*
