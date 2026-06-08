@@ -1,20 +1,19 @@
 const express = require('express');
 const router = express.Router();
-const { supabase } = require('../config/supabase');
+const { query } = require('../config/database');
 
 // GET /api/users/:id - Get user profile
 router.get('/:id', async (req, res) => {
   try {
-    const { data, error } = await supabase
-      .from('users')
-      .select('*')
-      .eq('id', req.params.id)
-      .single();
+    const { rows } = await query('SELECT id, phone_number, display_name, avatar_url, notification_enabled, language, theme, created_at FROM users WHERE id = $1', [req.params.id]);
 
-    if (error) throw error;
-    res.json({ user: data });
+    if (rows.length === 0) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    res.json({ user: rows[0] });
   } catch (error) {
-    res.status(404).json({ error: 'User not found' });
+    res.status(500).json({ error: 'Failed to fetch user' });
   }
 });
 
@@ -23,23 +22,47 @@ router.put('/:id', async (req, res) => {
   try {
     const { display_name, avatar_url, notification_enabled, language, theme } = req.body;
 
-    const updates = {};
-    if (display_name !== undefined) updates.display_name = display_name;
-    if (avatar_url !== undefined) updates.avatar_url = avatar_url;
-    if (notification_enabled !== undefined) updates.notification_enabled = notification_enabled;
-    if (language !== undefined) updates.language = language;
-    if (theme !== undefined) updates.theme = theme;
-    updates.updated_at = new Date().toISOString();
+    const updates = [];
+    const params = [];
+    let paramCount = 1;
 
-    const { data, error } = await supabase
-      .from('users')
-      .update(updates)
-      .eq('id', req.params.id)
-      .select()
-      .single();
+    if (display_name !== undefined) {
+      updates.push(`display_name = $${paramCount++}`);
+      params.push(display_name);
+    }
+    if (avatar_url !== undefined) {
+      updates.push(`avatar_url = $${paramCount++}`);
+      params.push(avatar_url);
+    }
+    if (notification_enabled !== undefined) {
+      updates.push(`notification_enabled = $${paramCount++}`);
+      params.push(notification_enabled);
+    }
+    if (language !== undefined) {
+      updates.push(`language = $${paramCount++}`);
+      params.push(language);
+    }
+    if (theme !== undefined) {
+      updates.push(`theme = $${paramCount++}`);
+      params.push(theme);
+    }
 
-    if (error) throw error;
-    res.json({ user: data });
+    if (updates.length === 0) {
+      return res.status(400).json({ error: 'No fields to update' });
+    }
+
+    updates.push(`updated_at = NOW()`);
+
+    params.push(req.params.id);
+    const sql = `UPDATE users SET ${updates.join(', ')} WHERE id = $${paramCount} RETURNING id, phone_number, display_name, avatar_url, notification_enabled, language, theme`;
+
+    const { rows } = await query(sql, params);
+
+    if (rows.length === 0) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    res.json({ user: rows[0] });
   } catch (error) {
     console.error('Update user error:', error);
     res.status(500).json({ error: 'Failed to update user' });
@@ -49,14 +72,8 @@ router.put('/:id', async (req, res) => {
 // GET /api/users/:id/services - Get services posted by user
 router.get('/:id/services', async (req, res) => {
   try {
-    const { data, error } = await supabase
-      .from('services')
-      .select('*')
-      .eq('user_id', req.params.id)
-      .order('created_at', { ascending: false });
-
-    if (error) throw error;
-    res.json({ services: data });
+    const { rows } = await query('SELECT * FROM services WHERE user_id = $1 ORDER BY created_at DESC', [req.params.id]);
+    res.json({ services: rows });
   } catch (error) {
     res.status(500).json({ error: 'Failed to fetch user services' });
   }

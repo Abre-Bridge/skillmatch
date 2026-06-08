@@ -1,4 +1,4 @@
-const { supabase } = require('../config/supabase');
+const { query } = require('../config/database');
 
 const onlineUsers = new Map(); // userId -> socketId
 
@@ -30,38 +30,28 @@ function setupChatSocket(io) {
       try {
         const { conversation_id, sender_id, content } = data;
 
-        // Save message to database
-        const { data: message, error } = await supabase
-          .from('messages')
-          .insert({
-            conversation_id,
-            sender_id,
-            content,
-            is_read: false,
-            created_at: new Date().toISOString(),
-          })
-          .select('*, sender:users!messages_sender_id_fkey(display_name, avatar_url)')
-          .single();
+        // Save message to Postgres
+        const { rows: msgRows } = await query(
+          'INSERT INTO messages (conversation_id, sender_id, content, is_read, created_at) VALUES ($1, $2, $3, false, NOW()) RETURNING *',
+          [conversation_id, sender_id, content]
+        );
+        let message = msgRows[0];
 
-        if (error) throw error;
+        // Fetch sender details
+        const { rows: userRows } = await query('SELECT display_name, avatar_url FROM users WHERE id = $1', [sender_id]);
+        message.sender = userRows[0];
 
         // Update conversation timestamp
-        await supabase
-          .from('conversations')
-          .update({ updated_at: new Date().toISOString() })
-          .eq('id', conversation_id);
+        await query('UPDATE conversations SET updated_at = NOW() WHERE id = $1', [conversation_id]);
 
         // Emit to conversation room
         io.to(`conv_${conversation_id}`).emit('new_message', message);
 
         // Get conversation to find recipient
-        const { data: conv } = await supabase
-          .from('conversations')
-          .select('user1_id, user2_id')
-          .eq('id', conversation_id)
-          .single();
-
-        if (conv) {
+        const { rows: convRows } = await query('SELECT user1_id, user2_id FROM conversations WHERE id = $1', [conversation_id]);
+        
+        if (convRows.length > 0) {
+          const conv = convRows[0];
           const recipientId = conv.user1_id === sender_id ? conv.user2_id : conv.user1_id;
           const recipientSocketId = onlineUsers.get(recipientId);
 
@@ -98,12 +88,10 @@ function setupChatSocket(io) {
     socket.on('mark_read', async (data) => {
       try {
         const { conversation_id, user_id } = data;
-        await supabase
-          .from('messages')
-          .update({ is_read: true })
-          .eq('conversation_id', conversation_id)
-          .neq('sender_id', user_id)
-          .eq('is_read', false);
+        await query(
+           'UPDATE messages SET is_read = true WHERE conversation_id = $1 AND sender_id != $2 AND is_read = false',
+           [conversation_id, user_id]
+        );
 
         socket.to(`conv_${conversation_id}`).emit('messages_read', {
           conversation_id,

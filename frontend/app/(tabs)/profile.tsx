@@ -1,5 +1,7 @@
 import React from 'react';
 import { View, StyleSheet, ScrollView, TouchableOpacity, Image, Switch } from 'react-native';
+import * as ImagePicker from 'expo-image-picker';
+import { api } from '../../src/services/api';
 import { useRouter } from 'expo-router';
 import { useApp } from '../../src/contexts/AppContext';
 import { Typography } from '../../src/components/Typography';
@@ -8,6 +10,29 @@ import { icons } from '../../src/constants';
 export default function Profile() {
   const { colors, t, user, setUser, themePreference, setThemePreference, language, setLanguage, notificationsEnabled, setNotificationsEnabled } = useApp();
   const router = useRouter();
+
+  const pickImage = async () => {
+    let result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images'],
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.5,
+    });
+
+    if (!result.canceled) {
+      try {
+        const uri = result.assets[0].uri;
+        const updatedUser = { ...user, avatar_url: uri };
+        await setUser(updatedUser as any, undefined);
+        
+        if (user && user.id) {
+          await api.updateUser(user.id, { avatar_url: uri });
+        }
+      } catch (e) {
+        console.error('Failed to update avatar on server', e);
+      }
+    }
+  };
 
   const handleLogout = async () => {
     await setUser(null);
@@ -36,6 +61,7 @@ export default function Profile() {
 
   const menuItems = [
     { icon: icons.calendar, title: t('my_services'), action: () => {} },
+    { icon: icons.star, title: 'Post a Service', action: () => router.push('/post-service') },
     { icon: icons.wallet, title: 'Payments (Demo)', action: () => {} },
     { icon: icons.person, title: t('profile'), action: () => {} },
     { 
@@ -75,7 +101,7 @@ export default function Profile() {
               source={{ uri: user?.avatar_url || 'https://via.placeholder.com/150' }} 
               style={styles.avatar} 
             />
-            <TouchableOpacity style={styles.editAvatarBtn}>
+            <TouchableOpacity style={styles.editAvatarBtn} onPress={pickImage}>
               <Image source={icons.edit} style={styles.editIcon} />
             </TouchableOpacity>
           </View>

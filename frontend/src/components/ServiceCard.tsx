@@ -66,9 +66,9 @@ export const ServiceCard = ({
             </TouchableOpacity>
           </View>
         </View>
-        <View style={styles.ratingBadge}>
+        <View style={[styles.ratingBadge, { backgroundColor: colors.bg_rating }]}>
           <Image source={icons.star} style={styles.starIcon} />
-          <Typography variant="caption" weight="bold">{rating.toFixed(1)}</Typography>
+          <Typography variant="caption" color={colors.rating_color} weight="bold">{Number(rating || 0).toFixed(1)}</Typography>
         </View>
       </TouchableOpacity>
     );
@@ -84,9 +84,9 @@ export const ServiceCard = ({
       <Image source={{ uri: imageUrl }} style={styles.vImage} />
       {/* Overlay gradient would go here, simulating with view */}
       <View style={styles.vOverlay}>
-        <View style={styles.vRatingBadge}>
+        <View  style={[styles.vRatingBadge, { backgroundColor: colors.bg_rating }]}>
           <Image source={icons.star} style={styles.starIcon} />
-          <Typography variant="caption" weight="bold">{rating.toFixed(1)}</Typography>
+          <Typography variant="caption" color={colors.rating_color} weight="bold">{Number(rating || 0).toFixed(1)}</Typography>
         </View>
         
         <View style={styles.vBottomContent}>
@@ -111,15 +111,16 @@ export const ServiceCard = ({
 const styles = StyleSheet.create({
   // Horizontal Styles
   hContainer: {
-    width: '100%',
+    width: '48%',
     borderRadius: 16,
     flexDirection: 'column',
-    padding: 12,
+    padding: 10,
+    marginRight: 1,
     marginBottom: 16,
   },
   hImage: {
     width: '100%',
-    height: 140,
+    height: 120,
     borderRadius: 12,
   },
   hContent: {
@@ -143,10 +144,9 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: 24,
     right: 24,
-    backgroundColor: 'rgba(255, 255, 255, 0.9)',
     paddingHorizontal: 8,
     paddingVertical: 4,
-    borderRadius: 12,
+    borderRadius: 14,
     flexDirection: 'row',
     alignItems: 'center',
   },
@@ -159,8 +159,8 @@ const styles = StyleSheet.create({
 
   // Vertical Styles (Featured)
   vContainer: {
-    width: 240,
-    height: 300,
+    width: 210,
+    height: 260,
     borderRadius: 24,
     marginRight: 16,
     overflow: 'hidden',
@@ -178,10 +178,11 @@ const styles = StyleSheet.create({
   },
   vRatingBadge: {
     alignSelf: 'flex-end',
-    backgroundColor: 'rgba(255, 255, 255, 0.9)',
+    color: 'rgba(255, 255, 255, 0.9)',
+    backgroundColor: 'rgba(0, 0, 0, 0.82)',
     paddingHorizontal: 10,
     paddingVertical: 6,
-    borderRadius: 12,
+    borderRadius: 14,
     flexDirection: 'row',
     alignItems: 'center',
   },

@@ -1,86 +1,99 @@
 const express = require('express');
 const router = express.Router();
-const { supabase } = require('../config/supabase');
+const bcrypt = require('bcryptjs');
+const { query } = require('../config/database');
+const { generateToken } = require('../middleware/auth');
 
-// POST /api/auth/google - Authenticate with Google
-router.post('/google', async (req, res) => {
+// POST /api/auth/register - Register with phone and password
+router.post('/register', async (req, res) => {
   try {
-    const { id_token, user_info } = req.body;
+    const { phone_number, password, display_name } = req.body;
 
-    if (!user_info || !user_info.email) {
-      return res.status(400).json({ error: 'Missing user information' });
+    if (!phone_number || !password || !display_name) {
+      return res.status(400).json({ error: 'Missing required fields (phone_number, password, display_name)' });
     }
-
-    const { email, name, picture, id: googleId } = user_info;
 
     // Check if user exists
-    const { data: existingUser, error: fetchError } = await supabase
-      .from('users')
-      .select('*')
-      .eq('email', email)
-      .single();
-
-    if (fetchError && fetchError.code !== 'PGRST116') {
-      throw fetchError;
+    const existingUser = await query('SELECT id FROM users WHERE phone_number = $1', [phone_number]);
+    if (existingUser.rows.length > 0) {
+      return res.status(400).json({ error: 'Phone number already registered' });
     }
 
-    let user;
-    if (existingUser) {
-      // Update last login
-      const { data: updatedUser, error: updateError } = await supabase
-        .from('users')
-        .update({
-          last_login: new Date().toISOString(),
-          avatar_url: picture || existingUser.avatar_url,
-        })
-        .eq('id', existingUser.id)
-        .select()
-        .single();
+    // Hash password
+    const salt = await bcrypt.genSalt(10);
+    const password_hash = await bcrypt.hash(password, salt);
 
-      if (updateError) throw updateError;
-      user = updatedUser;
-    } else {
-      // Create new user
-      const { data: newUser, error: createError } = await supabase
-        .from('users')
-        .insert({
-          email,
-          display_name: name || email.split('@')[0],
-          avatar_url: picture || null,
-          google_id: googleId,
-          created_at: new Date().toISOString(),
-          last_login: new Date().toISOString(),
-          notification_enabled: true,
-          language: 'en',
-          theme: 'system',
-        })
-        .select()
-        .single();
+    // Insert user
+    const newUser = await query(
+      `INSERT INTO users (phone_number, password_hash, display_name, created_at, last_login) 
+       VALUES ($1, $2, $3, NOW(), NOW()) RETURNING id, phone_number, display_name, avatar_url, notification_enabled, language, theme`,
+      [phone_number, password_hash, display_name]
+    );
 
-      if (createError) throw createError;
-      user = newUser;
-    }
+    const user = newUser.rows[0];
+    const token = generateToken(user);
 
-    res.json({ user, message: 'Authentication successful' });
+    res.status(201).json({ user, token, message: 'Registration successful' });
   } catch (error) {
-    console.error('Auth error:', error);
-    res.status(500).json({ error: 'Authentication failed' });
+    console.error('Registration error:', error);
+    res.status(500).json({ error: 'Registration failed' });
+  }
+});
+
+// POST /api/auth/login - Login with phone and password
+router.post('/login', async (req, res) => {
+  try {
+    const { phone_number, password } = req.body;
+
+    if (!phone_number || !password) {
+      return res.status(400).json({ error: 'Missing phone_number or password' });
+    }
+
+    const result = await query('SELECT * FROM users WHERE phone_number = $1', [phone_number]);
+    
+    if (result.rows.length === 0) {
+      return res.status(401).json({ error: 'Invalid phone number or password' });
+    }
+
+    const user = result.rows[0];
+
+    // Verify password
+    const validPassword = await bcrypt.compare(password, user.password_hash);
+    if (!validPassword) {
+      return res.status(401).json({ error: 'Invalid phone number or password' });
+    }
+
+    // Update last login
+    const updatedUserRes = await query(
+      'UPDATE users SET last_login = NOW() WHERE id = $1 RETURNING id, phone_number, display_name, avatar_url, notification_enabled, language, theme',
+      [user.id]
+    );
+
+    const updatedUser = updatedUserRes.rows[0];
+    const token = generateToken(updatedUser);
+
+    res.json({ user: updatedUser, token, message: 'Login successful' });
+  } catch (error) {
+    console.error('Login error:', error);
+    res.status(500).json({ error: 'Login failed' });
   }
 });
 
 // GET /api/auth/user/:id - Get user by ID
 router.get('/user/:id', async (req, res) => {
   try {
-    const { data: user, error } = await supabase
-      .from('users')
-      .select('*')
-      .eq('id', req.params.id)
-      .single();
+    const result = await query(
+      'SELECT id, phone_number, display_name, avatar_url, notification_enabled, language, theme, created_at FROM users WHERE id = $1',
+      [req.params.id]
+    );
 
-    if (error) throw error;
-    res.json({ user });
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    res.json({ user: result.rows[0] });
   } catch (error) {
-    res.status(404).json({ error: 'User not found' });
+    res.status(500).json({ error: 'Failed to fetch user' });
   }
 });
 

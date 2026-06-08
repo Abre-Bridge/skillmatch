@@ -1,4 +1,5 @@
 import ENV from '../config/env';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const API_URL = ENV.API_URL;
 
@@ -9,12 +10,18 @@ class ApiService {
     this.baseUrl = API_URL;
   }
 
+  private async getToken() {
+    return await AsyncStorage.getItem('@skillmatch_token');
+  }
+
   private async request(endpoint: string, options: RequestInit = {}) {
     const url = `${this.baseUrl}${endpoint}`;
-    console.log(url);
+    const token = await this.getToken();
+
     const config: RequestInit = {
       headers: {
         'Content-Type': 'application/json',
+        ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
         ...options.headers,
       },
       ...options,
@@ -36,10 +43,17 @@ class ApiService {
   }
 
   // Auth
-  async loginWithGoogle(userInfo: any) {
-    return this.request('/auth/google', {
+  async loginWithPhone(phone_number: string, password: string) {
+    return this.request('/auth/login', {
       method: 'POST',
-      body: JSON.stringify({ user_info: userInfo }),
+      body: JSON.stringify({ phone_number, password }),
+    });
+  }
+
+  async registerWithPhone(phone_number: string, password: string, display_name: string) {
+    return this.request('/auth/register', {
+      method: 'POST',
+      body: JSON.stringify({ phone_number, password, display_name }),
     });
   }
 
@@ -81,6 +95,13 @@ class ApiService {
 
   async deleteService(id: string) {
     return this.request(`/services/${id}`, { method: 'DELETE' });
+  }
+
+  async rateService(serviceId: string, userId: string, rating: number) {
+    return this.request(`/services/${serviceId}/reviews`, {
+      method: 'POST',
+      body: JSON.stringify({ user_id: userId, rating }),
+    });
   }
 
   // Search

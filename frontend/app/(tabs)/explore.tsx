@@ -15,6 +15,10 @@ export default function Explore() {
   const [query, setQuery] = useState((q as string) || '');
   const [results, setResults] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
+  const [showFilters, setShowFilters] = useState(false);
+  const [activeFilter, setActiveFilter] = useState('All');
+
+  const categories = ['All', 'Development', 'Design', 'Repair', 'Cleaning', 'Photography', 'Music'];
 
   useEffect(() => {
     if (query) {
@@ -25,15 +29,17 @@ export default function Explore() {
     }
   }, []);
 
-  const handleSearch = async (overrideQuery?: string) => {
+  const handleSearch = async (overrideQuery?: string, overrideCategory?: string) => {
     const qToUse = overrideQuery !== undefined ? overrideQuery : query;
+    const cToUse = overrideCategory !== undefined ? overrideCategory : activeFilter;
+
     try {
       setLoading(true);
       if (!qToUse.trim()) {
-         const res = await api.getServices();
+         const res = await api.getServices({ category: cToUse });
          setResults(res.services || []);
       } else {
-         const res = await api.searchServices(qToUse);
+         const res = await api.searchServices(qToUse, { category: cToUse });
          setResults(res.services || []);
       }
     } catch (e) {
@@ -66,10 +72,30 @@ export default function Explore() {
             returnKeyType="search"
           />
         </View>
-        <TouchableOpacity style={[styles.filterBtn, { backgroundColor: colors.primary }]}>
-          <Image source={icons.filter} style={[styles.filterIcon, { tintColor: '#FFF' }]} />
+        <TouchableOpacity style={[styles.filterBtn, { backgroundColor: showFilters ? colors.primary : colors.card }]} onPress={() => setShowFilters(!showFilters)}>
+          <Image source={icons.filter} style={[styles.filterIcon, { tintColor: showFilters ? '#FFF' : colors.primary }]} />
         </TouchableOpacity>
       </View>
+
+      {showFilters && (
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterRow}>
+          {categories.map((cat) => (
+            <TouchableOpacity 
+              key={cat} 
+              style={[
+                styles.categoryPill, 
+                { backgroundColor: activeFilter === cat ? colors.primary : colors.card, borderColor: colors.border }
+              ]}
+              onPress={() => {
+                setActiveFilter(cat);
+                handleSearch(query, cat);
+              }}
+            >
+              <Typography variant="body2" color={activeFilter === cat ? '#FFF' : colors.black1}>{cat}</Typography>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+      )}
 
       <Typography variant="h5" style={styles.resultCount}>
         {t('found_services').replace('{count}', String(results.length))}
@@ -166,6 +192,18 @@ const styles = StyleSheet.create({
   resultCount: {
     paddingHorizontal: 24,
     marginBottom: 16,
+  },
+  filterRow: {
+    paddingHorizontal: 24,
+    paddingBottom: 16,
+    flexDirection: 'row',
+  },
+  categoryPill: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+    borderWidth: 1,
+    marginRight: 8,
   },
   scroll: {
     paddingHorizontal: 24,

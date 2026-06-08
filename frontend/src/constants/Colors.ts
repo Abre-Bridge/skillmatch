@@ -20,8 +20,12 @@ export const Colors = {
     overlay: 'rgba(0, 0, 0, 0.5)',
     tabBar: '#FFFFFF',
     tabBarBorder: '#E8E8E8',
+    bg_rating:'#b4b3b3ec',
+    rating_color:'#000000ff',
   },
   dark: {
+     bg_rating:'#1f1e1eee',
+    rating_color:'#ffffffff',
     primary: '#0061FF',
     primaryLight: 'rgba(0, 97, 255, 0.20)',
     primaryUltraLight: 'rgba(0, 97, 255, 0.08)',

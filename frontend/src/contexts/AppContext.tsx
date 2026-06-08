@@ -6,7 +6,7 @@ import { Colors, ThemeName, ColorScheme } from '../constants/Colors';
 
 interface User {
   id: string;
-  email: string;
+  phone_number: string;
   display_name: string;
   avatar_url: string | null;
   notification_enabled: boolean;
@@ -17,8 +17,9 @@ interface User {
 interface AppContextType {
   // Auth
   user: User | null;
-  setUser: (user: User | null) => void;
+  setUser: (user: User | null, token?: string | null) => void;
   isLoggedIn: boolean;
+  token: string | null;
 
   // Theme
   theme: ThemeName;
@@ -40,6 +41,7 @@ const AppContext = createContext<AppContextType | undefined>(undefined);
 
 const STORAGE_KEYS = {
   USER: '@skillmatch_user',
+  TOKEN: '@skillmatch_token',
   THEME: '@skillmatch_theme',
   LANGUAGE: '@skillmatch_language',
   NOTIFICATIONS: '@skillmatch_notifications',
@@ -48,6 +50,7 @@ const STORAGE_KEYS = {
 export function AppProvider({ children }: { children: ReactNode }) {
   const systemColorScheme = useColorScheme();
   const [user, setUserState] = useState<User | null>(null);
+  const [token, setTokenState] = useState<string | null>(null);
   const [themePreference, setThemePrefState] = useState<'system' | 'light' | 'dark'>('system');
   const [language, setLangState] = useState<Language>('en');
   const [notificationsEnabled, setNotifState] = useState(true);
@@ -60,14 +63,16 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const loadSettings = async () => {
     try {
-      const [storedUser, storedTheme, storedLang, storedNotif] = await Promise.all([
+      const [storedUser, storedToken, storedTheme, storedLang, storedNotif] = await Promise.all([
         AsyncStorage.getItem(STORAGE_KEYS.USER),
+        AsyncStorage.getItem(STORAGE_KEYS.TOKEN),
         AsyncStorage.getItem(STORAGE_KEYS.THEME),
         AsyncStorage.getItem(STORAGE_KEYS.LANGUAGE),
         AsyncStorage.getItem(STORAGE_KEYS.NOTIFICATIONS),
       ]);
 
       if (storedUser) setUserState(JSON.parse(storedUser));
+      if (storedToken) setTokenState(storedToken);
       if (storedTheme) setThemePrefState(storedTheme as 'system' | 'light' | 'dark');
       if (storedLang) setLangState(storedLang as Language);
       if (storedNotif !== null) setNotifState(storedNotif === 'true');
@@ -79,12 +84,16 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const setUser = async (newUser: User | null) => {
+  const setUser = async (newUser: User | null, newToken?: string | null) => {
     setUserState(newUser);
+    if (newToken !== undefined) setTokenState(newToken);
+
     if (newUser) {
       await AsyncStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(newUser));
+      if (newToken) await AsyncStorage.setItem(STORAGE_KEYS.TOKEN, newToken);
     } else {
       await AsyncStorage.removeItem(STORAGE_KEYS.USER);
+      await AsyncStorage.removeItem(STORAGE_KEYS.TOKEN);
     }
   };
 
@@ -122,7 +131,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     return text;
   };
 
-  const isLoggedIn = !!user;
+  const isLoggedIn = !!user && !!token;
 
   return (
     <AppContext.Provider
@@ -130,6 +139,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         user,
         setUser,
         isLoggedIn,
+        token,
         theme,
         themePreference,
         setThemePreference,

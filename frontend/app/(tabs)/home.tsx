@@ -49,10 +49,22 @@ export default function Home() {
       setCategories([{name: 'All'}, {name: 'Development'}, {name: 'Design'}, {name: 'Writing'}]);
       setFeatured([{
         id: '1', title: 'Full-Stack Web Dev', price: 75, price_type: 'hourly', location: 'San Francisco', rating: 4.8, images: ['https://images.unsplash.com/photo-1498050108023-c5249f4df085?w=800']
-      }]);
+      },
+      {id: '2', title: 'BG', price: 90, price_type: 'hourly', location: 'Tokyo', rating: 4.9, images: ['https://images.unsplash.com/photo-1498050108023-c5249f4df085?w=800']
+    },
+      {id: '3', title: 'BG', price: 90, price_type: 'hourly', location: 'Tokyo', rating: 4.9, images: ['https://images.unsplash.com/photo-1498050108023-c5249f4df085?w=800']
+    }]);
       setRecommended([{
-        id: '2', title: 'UI/UX Design', price: 90, price_type: 'hourly', location: 'Tokyo', rating: 4.9, images: ['https://images.unsplash.com/photo-1561070791-2526d30994b5?w=800']
-      }]);
+        id: '4', title: 'UI/UX Design', price: 90, price_type: 'hourly', location: 'Tokyo', rating: 4.9, images: ['https://images.unsplash.com/photo-1561070791-2526d30994b5?w=800']
+      },
+      {id: '5', title: 'BG', price: 90, price_type: 'hourly', location: 'Tokyo', rating: 4.9, images: ['https://images.unsplash.com/photo-1498050108023-c5249f4df085?w=800']
+    },
+      {id: '6', title: 'BG', price: 90, price_type: 'hourly', location: 'Tokyo', rating: 4.9, images: ['https://images.unsplash.com/photo-1498050108023-c5249f4df085?w=800']
+    },
+      {id: '7', title: 'BG', price: 90, price_type: 'hourly', location: 'Tokyo', rating: 4.9, images: ['https://images.unsplash.com/photo-1498050108023-c5249f4df085?w=800']
+    },
+      {id: '8', title: 'BG', price: 90, price_type: 'hourly', location: 'Tokyo', rating: 4.9, images: ['https://images.unsplash.com/photo-1498050108023-c5249f4df085?w=800']
+    }]);
     } finally {
       setLoading(false);
     }
@@ -104,7 +116,7 @@ export default function Home() {
           </TouchableOpacity>
         </View>
 
-        {loading && <ActivityIndicator style={{ marginTop: 40 }} color={colors.primary} size="large" />}
+        {loading && <ActivityIndicator style={{ marginTop: 25 }} color={colors.primary} size="large" />}
 
         {/* Featured Section */}
         {!loading && featured.length > 0 && (
@@ -182,6 +194,7 @@ export default function Home() {
                   imageUrl={item.images?.[0] || 'https://via.placeholder.com/400'}
                   variant="horizontal"
                 />
+                
               ))}
             </View>
           </View>
@@ -204,25 +217,26 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 24,
+    marginBottom: 18,
+    marginTop:-20,
   },
   profileInfo: {
     flexDirection: 'row',
     alignItems: 'center',
   },
   avatar: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     marginRight: 16,
   },
   greeting: {
     justifyContent: 'center',
   },
   bellBtn: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     borderWidth: 1,
     justifyContent: 'center',
     alignItems: 'center',
@@ -234,13 +248,13 @@ const styles = StyleSheet.create({
   searchRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 32,
+    marginBottom: 20,
   },
   searchBar: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    height: 56,
+    height: 48,
     borderRadius: 16,
     paddingHorizontal: 16,
     marginRight: 16,
@@ -256,8 +270,8 @@ const styles = StyleSheet.create({
     fontSize: 14,
   },
   filterBtn: {
-    width: 56,
-    height: 56,
+    width: 48,
+    height: 48,
     borderRadius: 16,
     justifyContent: 'center',
     alignItems: 'center',
@@ -267,13 +281,13 @@ const styles = StyleSheet.create({
     height: 24,
   },
   section: {
-    marginBottom: 32,
+    marginBottom: 20,
   },
   sectionHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 16,
+    marginBottom: 14,
   },
   hScroll: {
     paddingRight: 24, // bleed compensator
@@ -289,5 +303,8 @@ const styles = StyleSheet.create({
   },
   grid: {
     width: '100%',
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent:'space-between',
   },
 });

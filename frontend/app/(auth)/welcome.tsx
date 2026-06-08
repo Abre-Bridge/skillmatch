@@ -1,61 +1,42 @@
 import React, { useState } from 'react';
-import { View, StyleSheet, Image, ScrollView } from 'react-native';
+import { View, StyleSheet, ScrollView, TextInput, TouchableOpacity, Alert } from 'react-native';
 import { useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import * as WebBrowser from 'expo-web-browser';
-import * as Google from 'expo-auth-session/providers/google';
-import { makeRedirectUri } from 'expo-auth-session';
 import { useApp } from '../../src/contexts/AppContext';
 import { Typography } from '../../src/components/Typography';
 import { Button } from '../../src/components/Button';
-import { icons, images } from '../../src/constants';
-import ENV from '../../src/config/env';
 import { api } from '../../src/services/api';
-
-WebBrowser.maybeCompleteAuthSession();
 
 export default function Welcome() {
   const router = useRouter();
   const { t, setUser, colors } = useApp();
   const [loading, setLoading] = useState(false);
+  const [isLogin, setIsLogin] = useState(true);
 
-  const redirectUri = makeRedirectUri({
-    scheme: 'com.xyberbridge.skillmatch',
-    path: 'auth/callback',
-  });
+  // Form state
+  const [phoneNumber, setPhoneNumber] = useState('');
+  const [password, setPassword] = useState('');
+  const [displayName, setDisplayName] = useState('');
 
-  const [request, response, promptAsync] = Google.useAuthRequest({
-    webClientId: ENV.GOOGLE_WEB_CLIENT_ID,
-    androidClientId: ENV.GOOGLE_ANDROID_CLIENT_ID,
-    iosClientId: ENV.GOOGLE_IOS_CLIENT_ID,
-    redirectUri,
-  });
-
-  React.useEffect(() => {
-    if (response?.type === 'success') {
-      const { authentication } = response;
-      handleGoogleLogin(authentication?.accessToken);
+  const handleSubmit = async () => {
+    if (!phoneNumber || !password || (!isLogin && !displayName)) {
+      Alert.alert('Error', 'Please fill in all fields');
+      return;
     }
-  }, [response]);
 
-  const handleGoogleLogin = async (accessToken: string | undefined) => {
-    if (!accessToken) return;
     try {
       setLoading(true);
-      const userInfoResponse = await fetch('https://www.googleapis.com/userinfo/v2/me', {
-        headers: { Authorization: `Bearer ${accessToken}` },
-      });
-      const userInfo = await userInfoResponse.json();
+      let res;
+      if (isLogin) {
+        res = await api.loginWithPhone(phoneNumber, password);
+      } else {
+        res = await api.registerWithPhone(phoneNumber, password, displayName);
+      }
 
-      const res = await api.loginWithGoogle({
-        user_info: userInfo,
-        id_token: null,
-      });
-
-      await setUser(res.user);
+      await setUser(res.user, res.token);
       router.replace('/(tabs)/home');
-    } catch (error) {
-      console.error('Login error', error);
+    } catch (error: any) {
+      Alert.alert('Authentication Failed', error.message || 'An error occurred.');
     } finally {
       setLoading(false);
     }
@@ -65,35 +46,63 @@ export default function Welcome() {
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <StatusBar style="dark" />
       <ScrollView contentContainerStyle={styles.scroll}>
-        <View style={styles.imageGrid}>
-          <Image source={images.onboarding} style={styles.onboardingImage} resizeMode="contain" />
+        <View style={styles.header}>
+          <Typography variant="h1" align="center" style={styles.title}>
+            {isLogin ? 'Welcome Back' : 'Create Account'}
+          </Typography>
+          <Typography variant="body2" color={colors.black2} align="center" style={styles.desc}>
+            {isLogin ? 'Login to continue to SkillMatch' : 'Sign up to showcase and find services'}
+          </Typography>
         </View>
 
-        <View style={[styles.content, { backgroundColor: colors.background }]}>
-          <Typography variant="caption" weight="medium" color={colors.black3} style={styles.subtitle}>
-            {t('welcome_to')}
-          </Typography>
+        <View style={styles.formContainer}>
+          {!isLogin && (
+            <View style={[styles.inputGroup, { backgroundColor: colors.card, borderColor: colors.border }]}>
+              <TextInput
+                placeholder="Full Name"
+                placeholderTextColor={colors.black3}
+                style={[styles.input, { color: colors.text }]}
+                value={displayName}
+                onChangeText={setDisplayName}
+              />
+            </View>
+          )}
 
-          <Typography variant="h1" align="center" style={styles.title}>
-            {t('welcome_title')}
-            <Typography variant="h1" color={colors.primary}>
-              {t('welcome_highlight')}
-            </Typography>
-          </Typography>
+          <View style={[styles.inputGroup, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            <TextInput
+              placeholder="Phone Number"
+              placeholderTextColor={colors.black3}
+              keyboardType="phone-pad"
+              style={[styles.input, { color: colors.text }]}
+              value={phoneNumber}
+              onChangeText={setPhoneNumber}
+            />
+          </View>
 
-          <Typography variant="body2" color={colors.black2} align="center" style={styles.desc}>
-            {t('welcome_subtitle')}
-          </Typography>
+          <View style={[styles.inputGroup, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            <TextInput
+              placeholder="Password"
+              placeholderTextColor={colors.black3}
+              secureTextEntry
+              style={[styles.input, { color: colors.text }]}
+              value={password}
+              onChangeText={setPassword}
+            />
+          </View>
 
           <Button
-            title={t('sign_up_google')}
-            onPress={() => promptAsync()}
+            title={isLogin ? 'Login' : 'Sign Up'}
+            onPress={handleSubmit}
             loading={loading}
-            leftIcon={icons.google}
             fullWidth
-            style={[styles.btn, { backgroundColor: colors.card, borderWidth: 1, borderColor: colors.border }]}
-            variant="outline"
+            style={styles.btn}
           />
+
+          <TouchableOpacity onPress={() => setIsLogin(!isLogin)} style={styles.toggleBtn}>
+            <Typography variant="body2" color={colors.primary} align="center">
+              {isLogin ? 'Don\'t have an account? Sign Up' : 'Already have an account? Login'}
+            </Typography>
+          </TouchableOpacity>
         </View>
       </ScrollView>
     </View>
@@ -102,25 +111,35 @@ export default function Welcome() {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  scroll: { flexGrow: 1 },
-  imageGrid: {
-    width: '100%',
-    height: 480,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: 40,
-  },
-  onboardingImage: { width: '90%', height: '100%' },
-  content: {
+  scroll: { flexGrow: 1, justifyContent: 'center' },
+  header: {
     padding: 24,
     alignItems: 'center',
-    borderTopLeftRadius: 30,
-    borderTopRightRadius: 30,
-    marginTop: -30,
-    flex: 1,
+    marginTop: 40,
   },
-  subtitle: { marginTop: 10, marginBottom: 20, letterSpacing: 1.5 },
-  title: { marginBottom: 20 },
-  desc: { marginBottom: 40 },
-  btn: { width: '100%', borderRadius: 30 },
+  title: { marginBottom: 10 },
+  desc: { marginBottom: 30 },
+  formContainer: {
+    padding: 24,
+    width: '100%',
+  },
+  inputGroup: {
+    width: '100%',
+    height: 56,
+    borderRadius: 16,
+    borderWidth: 1,
+    marginBottom: 16,
+    paddingHorizontal: 16,
+    justifyContent: 'center',
+  },
+  input: {
+    flex: 1,
+    fontSize: 16,
+    fontFamily: 'Inter-Medium',
+  },
+  btn: { width: '100%', borderRadius: 30, marginTop: 10 },
+  toggleBtn: {
+    marginTop: 20,
+    padding: 10,
+  },
 });

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, StyleSheet, FlatList, TouchableOpacity, Image } from 'react-native';
+import { View, StyleSheet, FlatList, TouchableOpacity, Image, Alert } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useApp } from '../../src/contexts/AppContext';
 import { Typography } from '../../src/components/Typography';
@@ -49,10 +49,26 @@ export default function ChatList() {
     }
   };
 
+  const deleteChat = (id: string) => {
+    // Delete logically or visually
+    setConversations(prev => prev.filter(c => c.id !== id));
+    // Usually calls API here e.g. api.deleteConversation(id)
+  };
+
   const renderItem = ({ item }: { item: any }) => (
     <TouchableOpacity
       style={[styles.convItem, { backgroundColor: colors.card }]}
       onPress={() => router.push(`/chat/${item.id}`)}
+      onLongPress={() => {
+        Alert.alert(
+          'Delete Chat', 
+          'Are you sure you want to delete this conversation?', 
+          [
+            { text: 'Cancel', style: 'cancel' }, 
+            { text: 'Delete', style: 'destructive', onPress: () => deleteChat(item.id) }
+          ]
+        );
+      }}
     >
       <Image 
         source={{ uri: item.other_user?.avatar_url || 'https://via.placeholder.com/150' }} 

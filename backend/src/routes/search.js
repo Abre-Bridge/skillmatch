@@ -1,18 +1,7 @@
 const express = require('express');
 const router = express.Router();
-const { supabase } = require('../config/supabase');
+const { query } = require('../config/database');
 
-/**
- * Intelligent contextual search for services.
- * Uses multiple strategies:
- * 1. Full-text search on title + description
- * 2. Semantic synonym expansion for common skill terms
- * 3. Category matching
- * 4. Tag matching
- * 5. Fuzzy partial matching
- */
-
-// Synonym map for contextual search
 const SYNONYM_MAP = {
   'developer': ['programmer', 'coder', 'software engineer', 'dev', 'coding', 'development', 'web developer', 'app developer'],
   'designer': ['graphic designer', 'ui designer', 'ux designer', 'design', 'creative', 'artist', 'illustrator'],
@@ -39,11 +28,10 @@ const SYNONYM_MAP = {
   'moving': ['mover', 'relocation', 'packing', 'hauling', 'furniture moving'],
 };
 
-function expandSearchTerms(query) {
-  const lowerQuery = query.toLowerCase().trim();
+function expandSearchTerms(searchQuery) {
+  const lowerQuery = searchQuery.toLowerCase().trim();
   const terms = new Set([lowerQuery]);
 
-  // Check for direct synonym matches
   for (const [key, synonyms] of Object.entries(SYNONYM_MAP)) {
     if (lowerQuery.includes(key) || synonyms.some(s => lowerQuery.includes(s))) {
       terms.add(key);
@@ -51,7 +39,6 @@ function expandSearchTerms(query) {
     }
   }
 
-  // Split multi-word queries and check each word
   const words = lowerQuery.split(/\s+/);
   for (const word of words) {
     if (word.length < 3) continue;
@@ -69,62 +56,67 @@ function expandSearchTerms(query) {
 // POST /api/search - Intelligent contextual search
 router.post('/', async (req, res) => {
   try {
-    const { query, category, min_price, max_price, location, limit = 20, offset = 0 } = req.body;
+    const { query: searchQuery, category, min_price, max_price, location, limit = 20, offset = 0 } = req.body;
 
-    if (!query || query.trim().length === 0) {
+    if (!searchQuery || searchQuery.trim().length === 0) {
       return res.status(400).json({ error: 'Search query is required' });
     }
 
-    const expandedTerms = expandSearchTerms(query);
+    const expandedTerms = expandSearchTerms(searchQuery).slice(0, 5); // Limit terms for pg query performance
     
-    // Build OR conditions for expanded terms
-    const orConditions = expandedTerms
-      .slice(0, 10) // Limit to avoid overly broad searches
-      .map(term => `title.ilike.%${term}%,description.ilike.%${term}%`)
-      .join(',');
+    let sql = `
+      SELECT s.*, 
+             json_build_object('display_name', u.display_name, 'avatar_url', u.avatar_url) as users
+      FROM services s
+      JOIN users u ON s.user_id = u.id
+      WHERE s.is_active = true
+    `;
+    const params = [];
+    let paramCount = 1;
 
-    let dbQuery = supabase
-      .from('services')
-      .select('*, users!services_user_id_fkey(display_name, avatar_url)')
-      .eq('is_active', true)
-      .or(orConditions);
+    // Build ILIKE conditions
+    if (expandedTerms.length > 0) {
+        const orConditions = expandedTerms.map(term => {
+            params.push(`%${term}%`);
+            const p = paramCount++;
+            return `(s.title ILIKE $${p} OR s.description ILIKE $${p})`;
+        }).join(' OR ');
+        sql += ` AND (${orConditions})`;
+    }
 
     if (category && category !== 'All') {
-      dbQuery = dbQuery.eq('category', category);
+      sql += ` AND s.category = $${paramCount++}`;
+      params.push(category);
     }
     if (min_price) {
-      dbQuery = dbQuery.gte('price', parseFloat(min_price));
+      sql += ` AND s.price >= $${paramCount++}`;
+      params.push(parseFloat(min_price));
     }
     if (max_price) {
-      dbQuery = dbQuery.lte('price', parseFloat(max_price));
+      sql += ` AND s.price <= $${paramCount++}`;
+      params.push(parseFloat(max_price));
     }
     if (location) {
-      dbQuery = dbQuery.ilike('location', `%${location}%`);
+      sql += ` AND s.location ILIKE $${paramCount++}`;
+      params.push(`%${location}%`);
     }
 
-    dbQuery = dbQuery
-      .order('rating', { ascending: false })
-      .range(parseInt(offset), parseInt(offset) + parseInt(limit) - 1);
+    sql += ` ORDER BY s.rating DESC LIMIT $${paramCount++} OFFSET $${paramCount}`;
+    params.push(parseInt(limit), parseInt(offset));
 
-    const { data, error } = await dbQuery;
-    if (error) throw error;
+    const { rows } = await query(sql, params);
 
     // Score and sort results by relevance
-    const scoredResults = (data || []).map(service => {
+    const scoredResults = rows.map(service => {
       let score = 0;
-      const lowerQuery = query.toLowerCase();
+      const lowerQuery = searchQuery.toLowerCase();
       const title = (service.title || '').toLowerCase();
       const description = (service.description || '').toLowerCase();
 
-      // Exact title match gets highest score
       if (title === lowerQuery) score += 100;
-      // Title contains query
       else if (title.includes(lowerQuery)) score += 50;
-      // Description contains query
       if (description.includes(lowerQuery)) score += 25;
-      // Rating boost
       score += (service.rating || 0) * 5;
-      // Featured boost
       if (service.is_featured) score += 20;
 
       return { ...service, _relevance_score: score };
@@ -135,8 +127,8 @@ router.post('/', async (req, res) => {
     res.json({
       services: scoredResults,
       count: scoredResults.length,
-      query,
-      expanded_terms: expandedTerms.slice(0, 5),
+      query: searchQuery,
+      expanded_terms: expandedTerms,
     });
   } catch (error) {
     console.error('Search error:', error);

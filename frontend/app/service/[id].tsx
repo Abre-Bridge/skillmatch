@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, StyleSheet, ScrollView, TouchableOpacity, Image, ActivityIndicator } from 'react-native';
+import { View, StyleSheet, ScrollView, TouchableOpacity, Image, ActivityIndicator, Alert } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useApp } from '../../src/contexts/AppContext';
 import { Typography } from '../../src/components/Typography';
@@ -65,6 +65,39 @@ export default function ServiceDetail() {
     return `$${service.price}${suffix}`;
   };
 
+  const submitRating = async (ratingVal: number) => {
+    if (!user || !service) return;
+    try {
+      setLoading(true);
+      await api.rateService(service.id, user.id, ratingVal);
+      await fetchService();
+      Alert.alert('Success', 'Rating dynamically saved and applied!');
+    } catch (e) {
+      console.error(e);
+      Alert.alert('Error', 'Failed to submit rating.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const showRatePrompt = () => {
+    Alert.alert(
+      'Rate Service',
+      'How many stars would you give this service?',
+      [
+        { text: '5 ★', onPress: () => submitRating(5) },
+        { text: '4 ★', onPress: () => submitRating(4) },
+        { text: '1 ★', style: 'destructive', onPress: () => submitRating(1) },
+        { text: 'Cancel', style: 'cancel' }
+      ]
+    );
+  };
+    if (service.price_type === 'exchange') return t('exchange');
+    if (service.price_type === 'negotiable') return t('negotiable');
+    const suffix = service.price_type === 'hourly' ? t('per_hour') : '';
+    return `$${service.price}${suffix}`;
+  };
+
   if (loading || !service) {
     return (
       <View style={[styles.container, styles.center, { backgroundColor: colors.background }]}>
@@ -94,13 +127,13 @@ export default function ServiceDetail() {
         <View style={styles.content}>
           <Typography variant="h3" style={styles.title}>{service.title}</Typography>
           
-          <View style={styles.ratingRow}>
+          <TouchableOpacity style={styles.ratingRow} onPress={showRatePrompt}>
             <Image source={icons.star} style={styles.starIcon} />
-            <Typography variant="h6" weight="bold">{service.rating.toFixed(1)}</Typography>
+            <Typography variant="h6" weight="bold">{Number(service.rating || 0).toFixed(1)}</Typography>
             <Typography variant="body2" color={colors.black3} style={styles.reviewCount}>
-              ({service.review_count} {t('reviews')})
+              ({service.review_count} {t('reviews')})  • Tap to rate
             </Typography>
-          </View>
+          </TouchableOpacity>
 
           <View style={styles.section}>
              <Typography variant="h5" style={styles.sectionTitle}>{t('description')}</Typography>

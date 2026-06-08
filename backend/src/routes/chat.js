@@ -1,35 +1,36 @@
 const express = require('express');
 const router = express.Router();
-const { supabase } = require('../config/supabase');
+const { query } = require('../config/database');
 
 // GET /api/chat/conversations/:userId - Get all conversations for a user
 router.get('/conversations/:userId', async (req, res) => {
   try {
     const { userId } = req.params;
 
-    const { data, error } = await supabase
-      .from('conversations')
-      .select(`
-        *,
-        user1:users!conversations_user1_id_fkey(id, display_name, avatar_url),
-        user2:users!conversations_user2_id_fkey(id, display_name, avatar_url),
-        messages(content, created_at, sender_id, is_read)
-      `)
-      .or(`user1_id.eq.${userId},user2_id.eq.${userId}`)
-      .order('updated_at', { ascending: false });
+    // Join users twice (for user1 and user2) and aggregate messages
+    const sql = `
+      SELECT c.*,
+             json_build_object('id', u1.id, 'display_name', u1.display_name, 'avatar_url', u1.avatar_url) as user1,
+             json_build_object('id', u2.id, 'display_name', u2.display_name, 'avatar_url', u2.avatar_url) as user2,
+             (
+               SELECT json_agg(json_build_object('content', m.content, 'created_at', m.created_at, 'sender_id', m.sender_id, 'is_read', m.is_read) ORDER BY m.created_at ASC)
+               FROM messages m WHERE m.conversation_id = c.id
+             ) as messages
+      FROM conversations c
+      JOIN users u1 ON c.user1_id = u1.id
+      JOIN users u2 ON c.user2_id = u2.id
+      WHERE c.user1_id = $1 OR c.user2_id = $1
+      ORDER BY c.updated_at DESC
+    `;
 
-    if (error) throw error;
+    const { rows } = await query(sql, [userId]);
 
-    // Format conversations to include other user info and last message
-    const conversations = (data || []).map(conv => {
+    const conversations = rows.map(conv => {
       const otherUser = conv.user1_id === userId ? conv.user2 : conv.user1;
       const messages = conv.messages || [];
-      const lastMessage = messages.sort((a, b) => 
-        new Date(b.created_at) - new Date(a.created_at)
-      )[0] || null;
-      const unreadCount = messages.filter(
-        m => m.sender_id !== userId && !m.is_read
-      ).length;
+      const sortedMessages = [...messages].sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+      const lastMessage = sortedMessages[0] || null;
+      const unreadCount = messages.filter(m => m.sender_id !== userId && !m.is_read).length;
 
       return {
         id: conv.id,
@@ -53,15 +54,18 @@ router.get('/messages/:conversationId', async (req, res) => {
   try {
     const { limit = 50, offset = 0 } = req.query;
 
-    const { data, error } = await supabase
-      .from('messages')
-      .select('*, sender:users!messages_sender_id_fkey(display_name, avatar_url)')
-      .eq('conversation_id', req.params.conversationId)
-      .order('created_at', { ascending: true })
-      .range(parseInt(offset), parseInt(offset) + parseInt(limit) - 1);
+    const sql = `
+      SELECT m.*, json_build_object('display_name', u.display_name, 'avatar_url', u.avatar_url) as sender
+      FROM messages m
+      JOIN users u ON m.sender_id = u.id
+      WHERE m.conversation_id = $1
+      ORDER BY m.created_at ASC
+      LIMIT $2 OFFSET $3
+    `;
 
-    if (error) throw error;
-    res.json({ messages: data });
+    const { rows } = await query(sql, [req.params.conversationId, parseInt(limit), parseInt(offset)]);
+
+    res.json({ messages: rows });
   } catch (error) {
     res.status(500).json({ error: 'Failed to fetch messages' });
   }
@@ -76,46 +80,38 @@ router.post('/conversations', async (req, res) => {
       return res.status(400).json({ error: 'Both user IDs are required' });
     }
 
-    // Check for existing conversation between users about this service
-    let query = supabase
-      .from('conversations')
-      .select('*')
-      .or(`and(user1_id.eq.${user1_id},user2_id.eq.${user2_id}),and(user1_id.eq.${user2_id},user2_id.eq.${user1_id})`);
+    let checkSql = `
+      SELECT * FROM conversations 
+      WHERE ((user1_id = $1 AND user2_id = $2) OR (user1_id = $2 AND user2_id = $1))
+    `;
+    const params = [user1_id, user2_id];
     
     if (service_id) {
-      query = query.eq('service_id', service_id);
+      checkSql += ` AND service_id = $3`;
+      params.push(service_id);
     }
 
-    const { data: existing, error: fetchError } = await query.maybeSingle();
+    const { rows: existing } = await query(checkSql, params);
 
-    if (fetchError && fetchError.code !== 'PGRST116') throw fetchError;
-
-    if (existing) {
-      return res.json({ conversation: existing, isNew: false });
+    if (existing.length > 0) {
+      return res.json({ conversation: existing[0], isNew: false });
     }
 
-    // Create new conversation
-    const { data: newConv, error: createError } = await supabase
-      .from('conversations')
-      .insert({
-        user1_id,
-        user2_id,
-        service_id: service_id || null,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      })
-      .select()
-      .single();
+    const insertSql = `
+      INSERT INTO conversations (user1_id, user2_id, service_id, created_at, updated_at)
+      VALUES ($1, $2, $3, NOW(), NOW()) RETURNING *
+    `;
+    
+    const newConv = await query(insertSql, [user1_id, user2_id, service_id || null]);
 
-    if (createError) throw createError;
-    res.status(201).json({ conversation: newConv, isNew: true });
+    res.status(201).json({ conversation: newConv.rows[0], isNew: true });
   } catch (error) {
     console.error('Create conversation error:', error);
     res.status(500).json({ error: 'Failed to create conversation' });
   }
 });
 
-// POST /api/chat/messages - Send a message (REST fallback)
+// POST /api/chat/messages - Send a message
 router.post('/messages', async (req, res) => {
   try {
     const { conversation_id, sender_id, content } = req.body;
@@ -124,27 +120,22 @@ router.post('/messages', async (req, res) => {
       return res.status(400).json({ error: 'Missing required fields' });
     }
 
-    const { data, error } = await supabase
-      .from('messages')
-      .insert({
-        conversation_id,
-        sender_id,
-        content,
-        is_read: false,
-        created_at: new Date().toISOString(),
-      })
-      .select('*, sender:users!messages_sender_id_fkey(display_name, avatar_url)')
-      .single();
+    const { rows: messageRows } = await query(`
+      INSERT INTO messages (conversation_id, sender_id, content, is_read, created_at)
+      VALUES ($1, $2, $3, false, NOW())
+      RETURNING *
+    `, [conversation_id, sender_id, content]);
 
-    if (error) throw error;
+    let message = messageRows[0];
+
+    // Get sender info manually since RETURNING doesn't join
+    const { rows: userRows } = await query('SELECT display_name, avatar_url FROM users WHERE id = $1', [sender_id]);
+    message.sender = userRows[0];
 
     // Update conversation timestamp
-    await supabase
-      .from('conversations')
-      .update({ updated_at: new Date().toISOString() })
-      .eq('id', conversation_id);
+    await query('UPDATE conversations SET updated_at = NOW() WHERE id = $1', [conversation_id]);
 
-    res.status(201).json({ message: data });
+    res.status(201).json({ message });
   } catch (error) {
     console.error('Send message error:', error);
     res.status(500).json({ error: 'Failed to send message' });
@@ -156,14 +147,12 @@ router.put('/messages/read', async (req, res) => {
   try {
     const { conversation_id, user_id } = req.body;
 
-    const { error } = await supabase
-      .from('messages')
-      .update({ is_read: true })
-      .eq('conversation_id', conversation_id)
-      .neq('sender_id', user_id)
-      .eq('is_read', false);
+    await query(`
+      UPDATE messages 
+      SET is_read = true 
+      WHERE conversation_id = $1 AND sender_id != $2 AND is_read = false
+    `, [conversation_id, user_id]);
 
-    if (error) throw error;
     res.json({ message: 'Messages marked as read' });
   } catch (error) {
     res.status(500).json({ error: 'Failed to mark messages as read' });
