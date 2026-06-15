@@ -5,21 +5,22 @@ import { View, ActivityIndicator, Image, StyleSheet} from 'react-native';
 import { images } from '../src/constants';
 import Animated, { FadeIn } from 'react-native-reanimated';
 import { StatusBar } from 'expo-status-bar';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import * as SplashScreen from 'expo-splash-screen';
 
-SplashScreen.preventAutoHideAsync();
+SplashScreen.preventAutoHideAsync().catch(() => {});
 
-function RootLayoutNav() {
+function RootLayoutNav({ onLayoutReady }: { onLayoutReady: () => void }) {
   const { colors, theme, initialized } = useApp();
 
+  useEffect(() => {
+    if (initialized) {
+      onLayoutReady();
+    }
+  }, [initialized, onLayoutReady]);
+
   if (!initialized) {
-     return (
-        <View style={[styles.splashContainer, { backgroundColor: colors.background }]}>
-           <Image source={images.splashIcon} style={styles.splashIcon} resizeMode="contain" />
-           <ActivityIndicator size="small" color={colors.primary} style={{ marginTop: 20 }} />
-        </View>
-     );
+     return null;
   }
 
   return (
@@ -37,19 +38,8 @@ function RootLayoutNav() {
   );
 }
 
-const styles = StyleSheet.create({
-  splashContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  splashIcon: {
-    width: 150,
-    height: 150,
-  }
-});
-
 export default function RootLayout() {
+  const [appReady, setAppReady] = useState(false);
   const [fontsLoaded] = useFonts({
     'Rubik-Light': require('../assets/fonts/Rubik-Light.ttf'),
     'Rubik-Regular': require('../assets/fonts/Rubik-Regular.ttf'),
@@ -60,10 +50,10 @@ export default function RootLayout() {
   });
 
   useEffect(() => {
-    if (fontsLoaded) {
-      SplashScreen.hideAsync();
+    if (fontsLoaded && appReady) {
+      SplashScreen.hideAsync().catch(() => {});
     }
-  }, [fontsLoaded]);
+  }, [fontsLoaded, appReady]);
 
   if (!fontsLoaded) {
     return null;
@@ -71,7 +61,7 @@ export default function RootLayout() {
 
   return (
     <AppProvider>
-      <RootLayoutNav />
+      <RootLayoutNav onLayoutReady={() => setAppReady(true)} />
     </AppProvider>
   );
 }

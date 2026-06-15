@@ -12,6 +12,7 @@ import { useRouter } from 'expo-router';
 import { useApp } from '../../src/contexts/AppContext';
 import { Typography } from '../../src/components/Typography';
 import { ServiceCard } from '../../src/components/ServiceCard';
+import { Loader } from '../../src/components/Loader';
 import { icons } from '../../src/constants';
 import { api, resolveImageUrl } from '../../src/services/api';
 
@@ -129,9 +130,7 @@ export default function Home() {
           </TouchableOpacity>
         </View>
 
-        {loading && <ActivityIndicator style={{ marginTop: 25 }} color={colors.primary} size="large" />}
-
-        {/* Featured Section */}
+        {loading && <Loader />}
         {!loading /*&& featured.length > 0*/ && (
           <View style={styles.section}>
             <View style={styles.sectionHeader}>

@@ -4,7 +4,7 @@
     "slug": "skillmatch",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/images/icon.png",
+    "icon": "./assets/images/icon.jpg",
     "scheme": "skillmatch",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
@@ -27,11 +27,17 @@
         "NSLocationAlwaysUsageDescription": "SkillMatch uses your location to recommend nearby services."
       }
     },
+    "web": {
+      "bundler": "metro",
+      "favicon": "./assets/images/favicon.png"
+    },
     "android": {
       "adaptiveIcon": {
-        "foregroundImage": "./assets/images/icon.png",
+        "foregroundImage": "./assets/images/icon.jpg",
         "backgroundColor": "#ffffff"
       },
+      "softwareKeyboardLayoutMode": "pan",
+      "versionCode": 1,
       "package": "com.skillmatch.app",
       "permissions": [
         "android.permission.CAMERA",
@@ -70,7 +76,7 @@
       [
         "expo-notifications",
         {
-          "icon": "./assets/images/icon.png",
+          "icon": "./assets/images/icon.jpg",
           "color": "#0061FF"
         }
       ],

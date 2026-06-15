@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { View, StyleSheet, ScrollView, TouchableOpacity, Image, ActivityIndicator, Alert, useWindowDimensions, Platform } from 'react-native';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { View, StyleSheet, ScrollView, TouchableOpacity, Image, Alert, useWindowDimensions, Platform } from 'react-native';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useApp } from '../../src/contexts/AppContext';
 import { Typography } from '../../src/components/Typography';
 import { Button } from '../../src/components/Button';
+import { Loader } from '../../src/components/Loader';
 import { icons, images } from '../../src/constants';
 import { api, resolveImageUrl } from '../../src/services/api';
 
@@ -144,11 +145,7 @@ export default function ServiceDetail() {
   };
 
   if (loading || !service) {
-    return (
-      <View style={[styles.container, styles.center, { backgroundColor: colors.background }]}>
-        <ActivityIndicator size="large" color={colors.primary} />
-      </View>
-    );
+    return <Loader fullScreen />;
   }
 
   return (

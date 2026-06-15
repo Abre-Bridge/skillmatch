@@ -88,7 +88,7 @@ export default function Profile() {
   const menuItems = [
     { icon: icons.calendar, title: t('my_services'), action: () => {} },
     { icon: icons.star, title: 'Post a Service', action: () => router.push('/post-service') },
-    { icon: icons.wallet, title: 'Payments (Demo)', action: () => {} },
+    { icon: icons.wallet, title: 'Payments ', action: () => {} },
     { icon: icons.person, title: t('profile'), action: () => {} },
     { 
       icon: icons.bell, 
